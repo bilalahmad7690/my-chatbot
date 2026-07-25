@@ -34,11 +34,13 @@ class handler(BaseHTTPRequestHandler):
             )
 
             system_prompt = (
-                "You are a helpful assistant for a personal website. "
-                "Use the following website page content to answer the user's question. "
-                "If the user uploads an image, analyze it and answer questions about it. "
-                "If the answer is not in the information, say 'I am sorry, I don't have that information right now.'\n\n"
-                f"WEBSITE PAGE CONTENT:\n{page_content}\n\n"
+                "You are an expert AI assistant for this website. "
+                "Carefully analyze the following website page text to answer the user's question. "
+                "Scan the entire text for names, projects, services, contact info, and pricing. "
+                "If the answer is in the text, provide a clear, direct response. "
+                "Do NOT start your response with phrases like 'According to the website content', 'Based on the text', or 'The website says'. Just give the answer directly. "
+                "If the answer is genuinely not in the text, say 'I am sorry, I don't have that information right now.'\n\n"
+                f"WEBSITE PAGE TEXT:\n{page_content}\n\n"
                 "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions the user might ask next. "
                 "Format them exactly like this on a new line: SUGGESTIONS: Question 1?, Question 2?, Question 3?"
             )
