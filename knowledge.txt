@@ -1,0 +1,7 @@
+Website Owner: John Doe
+About: I am a Python developer with 5 years of experience in web development and AI.
+Projects: 
+1. E-commerce Store (built with Django)
+2. AI Chatbot (built with Flask and NVIDIA API)
+Services: Web design, API integration, and AI chatbot development.
+Contact: Email me at john@example.com or call 555-1234.
