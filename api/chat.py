@@ -18,9 +18,9 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
             
             user_message = data.get('message', 'Hello')
-            page_content = data.get('pageContent', 'No website content provided.')[:2000]
-            # NEW: Get chat history to give the AI memory
+            page_content = data.get('pageContent', 'No website content provided.')[:1500]
             chat_history = data.get('history', [])
+            image_base64 = data.get('image', None) # NEW: Get image if uploaded
 
             # 2. Initialize NVIDIA AI
             from openai import OpenAI
@@ -36,24 +36,37 @@ class handler(BaseHTTPRequestHandler):
             system_prompt = (
                 "You are a helpful assistant for a personal website. "
                 "Use the following website page content to answer the user's question. "
+                "If the user uploads an image, analyze it and answer questions about it. "
                 "If the answer is not in the information, say 'I am sorry, I don't have that information right now.'\n\n"
                 f"WEBSITE PAGE CONTENT:\n{page_content}\n\n"
                 "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions the user might ask next. "
                 "Format them exactly like this on a new line: SUGGESTIONS: Question 1?, Question 2?, Question 3?"
             )
 
-            # 3. Build messages array WITH MEMORY
             messages = [{"role": "system", "content": system_prompt}]
             for msg in chat_history:
                 if msg.get('user'): messages.append({"role": "user", "content": msg.get('user')})
                 if msg.get('bot'): messages.append({"role": "assistant", "content": msg.get('bot')})
-            messages.append({"role": "user", "content": user_message})
+
+            # 3. Decide which AI model to use (Vision vs Text)
+            if image_base64:
+                # Use Llama 3.2 Vision Model for images
+                model_name = "meta/llama-3.2-11b-vision-instruct"
+                user_content = [
+                    {"type": "text", "text": user_message if user_message else "What is in this image?"},
+                    {"type": "image_url", "image_url": image_base64}
+                ]
+                messages.append({"role": "user", "content": user_content})
+            else:
+                # Use standard Text Model
+                model_name = "meta/llama-3.1-8b-instruct"
+                messages.append({"role": "user", "content": user_message})
 
             # 4. Ask NVIDIA AI for response
             response = client.chat.completions.create(
-                model="meta/llama-3.1-8b-instruct",
+                model=model_name,
                 messages=messages,
-                max_tokens=300,
+                max_tokens=400,
                 temperature=0.6
             )
             full_response = response.choices[0].message.content
