@@ -12,21 +12,16 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            # 1. Get the user message
+            # 1. Get the user message AND the website content
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
-            user_message = data.get('message', 'Hello')
             
-            # 2. Read knowledge file
-            try:
-                with open("./knowledge.txt", "r", encoding="utf-8") as file:
-                    website_data = file.read()
-            except:
-                website_data = "No website data available."
+            user_message = data.get('message', 'Hello')
+            # This grabs the website text sent from the browser
+            website_data = data.get('pageContent', 'No website content provided.')[:3000] # Limit to 3000 characters to save space
 
-            # 3. Initialize OpenAI client INSIDE the function
-            # This prevents the server from crashing if the key is missing
+            # 2. Initialize OpenAI client
             from openai import OpenAI
             api_key = os.environ.get("NVIDIA_API_KEY")
             if not api_key:
@@ -39,12 +34,12 @@ class handler(BaseHTTPRequestHandler):
 
             system_prompt = (
                 "You are a helpful assistant for a personal website. "
-                "Use the following website information to answer the user's question. "
+                "Use the following website page content to answer the user's question. "
                 "If the answer is not in the information, say 'I am sorry, I don't have that information right now.'\n\n"
-                f"WEBSITE INFORMATION:\n{website_data}"
+                f"WEBSITE PAGE CONTENT:\n{website_data}"
             )
 
-            # 4. Ask NVIDIA AI for response
+            # 3. Ask NVIDIA AI for response
             response = client.chat.completions.create(
                 model="meta/llama-3.1-8b-instruct",
                 messages=[
@@ -56,10 +51,9 @@ class handler(BaseHTTPRequestHandler):
             bot_response = response.choices[0].message.content
 
         except Exception as e:
-            # If ANY error happens, it will be sent to the chat window so we can see it!
             bot_response = f"SERVER ERROR: {str(e)}"
 
-        # 5. Send response back to WordPress
+        # 4. Send response back to WordPress
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
