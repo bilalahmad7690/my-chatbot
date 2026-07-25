@@ -12,20 +12,21 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            # 1. Get the user message AND the website content
+            # 1. Get data from website
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data)
             
             user_message = data.get('message', 'Hello')
-            # This grabs the website text sent from the browser
-            website_data = data.get('pageContent', 'No website content provided.')[:3000] # Limit to 3000 characters to save space
+            page_content = data.get('pageContent', 'No website content provided.')[:2000]
+            # NEW: Get chat history to give the AI memory
+            chat_history = data.get('history', [])
 
-            # 2. Initialize OpenAI client
+            # 2. Initialize NVIDIA AI
             from openai import OpenAI
             api_key = os.environ.get("NVIDIA_API_KEY")
             if not api_key:
-                raise Exception("NVIDIA_API_KEY is missing in Vercel Environment Variables!")
+                raise Exception("NVIDIA_API_KEY is missing!")
                 
             client = OpenAI(
                 base_url="https://integrate.api.nvidia.com/v1",
@@ -36,29 +37,46 @@ class handler(BaseHTTPRequestHandler):
                 "You are a helpful assistant for a personal website. "
                 "Use the following website page content to answer the user's question. "
                 "If the answer is not in the information, say 'I am sorry, I don't have that information right now.'\n\n"
-                f"WEBSITE PAGE CONTENT:\n{website_data}"
+                f"WEBSITE PAGE CONTENT:\n{page_content}\n\n"
+                "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions the user might ask next. "
+                "Format them exactly like this on a new line: SUGGESTIONS: Question 1?, Question 2?, Question 3?"
             )
 
-            # 3. Ask NVIDIA AI for response
+            # 3. Build messages array WITH MEMORY
+            messages = [{"role": "system", "content": system_prompt}]
+            for msg in chat_history:
+                if msg.get('user'): messages.append({"role": "user", "content": msg.get('user')})
+                if msg.get('bot'): messages.append({"role": "assistant", "content": msg.get('bot')})
+            messages.append({"role": "user", "content": user_message})
+
+            # 4. Ask NVIDIA AI for response
             response = client.chat.completions.create(
                 model="meta/llama-3.1-8b-instruct",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_message}
-                ],
-                max_tokens=150
+                messages=messages,
+                max_tokens=300,
+                temperature=0.6
             )
-            bot_response = response.choices[0].message.content
+            full_response = response.choices[0].message.content
+
+            # 5. Separate the text reply from the suggestions
+            if "SUGGESTIONS:" in full_response:
+                parts = full_response.split("SUGGESTIONS:")
+                bot_response = parts[0].strip()
+                suggestions = [s.strip() for s in parts[1].split(",")][:3]
+            else:
+                bot_response = full_response
+                suggestions = []
 
         except Exception as e:
             bot_response = f"SERVER ERROR: {str(e)}"
+            suggestions = []
 
-        # 4. Send response back to WordPress
+        # 6. Send response back to WordPress
         self.send_response(200)
         self.send_header('Content-type', 'application/json')
         self.send_header('Access-Control-Allow-Origin', '*')
         self.end_headers()
         
-        response_data = json.dumps({"reply": bot_response})
+        response_data = json.dumps({"reply": bot_response, "suggestions": suggestions})
         self.wfile.write(response_data.encode('utf-8'))
         return
