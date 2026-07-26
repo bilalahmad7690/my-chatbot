@@ -21,8 +21,6 @@ class handler(BaseHTTPRequestHandler):
             page_content = data.get('pageContent', 'No website content provided.')[:20000] 
             chat_history = data.get('history', [])
             image_base64 = data.get('image', None)
-            
-            # NEW: Get the automatic website name
             site_name = data.get('siteName', 'this website')
 
             from openai import OpenAI
@@ -35,14 +33,17 @@ class handler(BaseHTTPRequestHandler):
                 api_key=api_key
             )
 
+            # SMARTER PROMPT: Allows the AI to understand synonyms and related keywords
             system_prompt = (
-                f"You are the personal AI assistant for {site_name}. "
-                "Your job is to answer questions STRICTLY based on the provided CURRENT PAGE TEXT. "
+                f"You are the helpful AI assistant for {site_name}. "
+                "Your job is to answer questions based on the provided CURRENT PAGE TEXT. "
                 "STRICT RULE: NEVER mention the Privacy Policy, chat windows, or website layouts. "
                 "Focus ONLY on the website's projects, skills, services, pricing plans, and contact info. "
                 f"Whenever you refer to the website owner, use the name {site_name}. "
+                "If the user asks for a service, scan the text for related keywords (e.g., if they ask for 'web development', look for 'web design', 'WordPress', 'frontend', etc.). "
+                "If a matching or related service exists in the text, confidently confirm that you offer it and provide details from the text. "
                 "Do NOT start your response with phrases like 'According to the website'. "
-                "If the answer is genuinely not in the text, say 'I am sorry, I don\\'t have that information right now.'\n\n"
+                "If the answer is absolutely not in the text after careful analysis, say 'I am sorry, I don\\'t have that information right now.'\n\n"
                 f"CURRENT PAGE TEXT:\n{page_content}\n\n"
                 "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions. "
                 "Format them exactly like this on a new line: SUGGESTIONS: Question 1?, Question 2?, Question 3?"
@@ -68,7 +69,7 @@ class handler(BaseHTTPRequestHandler):
                 model=model_name,
                 messages=messages,
                 max_tokens=400,
-                temperature=0.3
+                temperature=0.4
             )
             full_response = response.choices[0].message.content
 
