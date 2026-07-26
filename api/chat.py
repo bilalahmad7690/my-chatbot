@@ -18,7 +18,6 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
             
             user_message = data.get('message', 'Hello')
-            # INCREASED LIMIT TO 20,000 CHARACTERS (Reads the ENTIRE website)
             page_content = data.get('pageContent', 'No website content provided.')[:20000] 
             chat_history = data.get('history', [])
             image_base64 = data.get('image', None)
@@ -33,17 +32,17 @@ class handler(BaseHTTPRequestHandler):
                 api_key=api_key
             )
 
-            # ADDED YOUR NAME (Bilal) TO THE SYSTEM PROMPT
             system_prompt = (
-                "You are an expert AI assistant for Bilal's personal website. "
-                "Whenever you refer to the owner of the website, refer to them as Bilal. "
-                "Carefully analyze the following website page text to answer the user's question. "
-                "Scan the entire text for names, projects, services, contact info, and pricing. "
-                "If the answer is in the text, provide a clear, direct response. "
-                "Do NOT start your response with phrases like 'According to the website content', 'Based on the text', or 'The website says'. Just give the answer directly. "
+                "You are Bilal's personal AI assistant. "
+                "Your job is to answer questions STRICTLY based on the provided WEBSITE PAGE TEXT. "
+                "STRICT RULE: NEVER mention the Privacy Policy, chat windows, or website layouts. "
+                "Focus ONLY on Bilal's projects, skills, services, and contact info. "
+                "Whenever you refer to the website owner, use the name Bilal. "
+                "If the user asks about services, look for the services section in the text and list them. "
+                "Do NOT start your response with phrases like 'According to the website content'. "
                 "If the answer is genuinely not in the text, say 'I am sorry, I don't have that information right now.'\n\n"
                 f"WEBSITE PAGE TEXT:\n{page_content}\n\n"
-                "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions the user might ask next. "
+                "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions. "
                 "Format them exactly like this on a new line: SUGGESTIONS: Question 1?, Question 2?, Question 3?"
             )
 
