@@ -2,6 +2,9 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import re
+import requests
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin
 
 class handler(BaseHTTPRequestHandler):
     def do_OPTIONS(self):
@@ -18,7 +21,8 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
             
             user_message = data.get('message', 'Hello')
-            page_content = data.get('pageContent', 'No website content provided.')[:20000] 
+            site_url = data.get('siteUrl', '') # e.g., https://bilal-ahmad.com
+            page_content = data.get('pageContent', '') # Fallback text from current page
             chat_history = data.get('history', [])
             image_base64 = data.get('image', None)
             site_name = data.get('siteName', 'this website')
@@ -33,18 +37,58 @@ class handler(BaseHTTPRequestHandler):
                 api_key=api_key
             )
 
-            # SMARTER PROMPT: Allows the AI to understand synonyms and related keywords
+            # --- UNIVERSAL AUTO-SCRAPER ---
+            # Python visits the website and reads multiple pages automatically
+            final_text = page_content # Start with the text sent from the browser
+            if site_url:
+                try:
+                    # 1. Fetch the homepage
+                    res = requests.get(site_url, timeout=4, headers={'User-Agent': 'Mozilla/5.0'})
+                    soup = BeautifulSoup(res.text, 'html.parser')
+                    
+                    # Remove scripts and styles
+                    for script in soup(["script", "style", "nav", "footer", "header"]):
+                        script.extract()
+                        
+                    home_text = soup.get_text(separator=' ', strip=True)
+                    final_text += "\n" + home_text
+
+                    # 2. Find links to important pages (Services, Pricing, About, Contact)
+                    important_links = []
+                    for a in soup.find_all('a', href=True):
+                        href = a['href'].lower()
+                        if any(word in href for word in ['service', 'price', 'plan', 'about', 'contact', 'portfolio']):
+                            full_url = urljoin(site_url, a['href'])
+                            if full_url.startswith(site_url) and full_url not in important_links:
+                                important_links.append(full_url)
+
+                    # 3. Fetch up to 3 important pages and read their text
+                    for link in important_links[:3]:
+                        try:
+                            sub_res = requests.get(link, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
+                            sub_soup = BeautifulSoup(sub_res.text, 'html.parser')
+                            for script in sub_soup(["script", "style", "nav", "footer", "header"]):
+                                script.extract()
+                            final_text += "\n" + sub_soup.get_text(separator=' ', strip=True)
+                        except:
+                            pass # Skip if a page fails to load
+                except:
+                    pass # If scraping fails, just use the fallback page_content
+
+            # Truncate to 15,000 characters to stay within AI limits
+            final_text = final_text[:15000]
+
             system_prompt = (
                 f"You are the helpful AI assistant for {site_name}. "
-                "Your job is to answer questions based on the provided CURRENT PAGE TEXT. "
+                "Your job is to answer questions based on the provided WEBSITE TEXT. "
                 "STRICT RULE: NEVER mention the Privacy Policy, chat windows, or website layouts. "
                 "Focus ONLY on the website's projects, skills, services, pricing plans, and contact info. "
                 f"Whenever you refer to the website owner, use the name {site_name}. "
-                "If the user asks for a service, scan the text for related keywords (e.g., if they ask for 'web development', look for 'web design', 'WordPress', 'frontend', etc.). "
-                "If a matching or related service exists in the text, confidently confirm that you offer it and provide details from the text. "
+                "If the user asks for a service or pricing, scan the text for related keywords. "
+                "If a matching or related service exists, confidently confirm that you offer it and provide details from the text. "
                 "Do NOT start your response with phrases like 'According to the website'. "
                 "If the answer is absolutely not in the text after careful analysis, say 'I am sorry, I don\\'t have that information right now.'\n\n"
-                f"CURRENT PAGE TEXT:\n{page_content}\n\n"
+                f"WEBSITE TEXT:\n{final_text}\n\n"
                 "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions. "
                 "Format them exactly like this on a new line: SUGGESTIONS: Question 1?, Question 2?, Question 3?"
             )
