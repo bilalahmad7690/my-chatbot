@@ -18,7 +18,8 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
             
             user_message = data.get('message', 'Hello')
-            page_content = data.get('pageContent', 'No website content provided.')[:4000] 
+            # INCREASED LIMIT TO 20,000 CHARACTERS (Reads the ENTIRE website)
+            page_content = data.get('pageContent', 'No website content provided.')[:20000] 
             chat_history = data.get('history', [])
             image_base64 = data.get('image', None)
 
@@ -32,8 +33,10 @@ class handler(BaseHTTPRequestHandler):
                 api_key=api_key
             )
 
+            # ADDED YOUR NAME (Bilal) TO THE SYSTEM PROMPT
             system_prompt = (
-                "You are an expert AI assistant for this website. "
+                "You are an expert AI assistant for Bilal's personal website. "
+                "Whenever you refer to the owner of the website, refer to them as Bilal. "
                 "Carefully analyze the following website page text to answer the user's question. "
                 "Scan the entire text for names, projects, services, contact info, and pricing. "
                 "If the answer is in the text, provide a clear, direct response. "
@@ -68,12 +71,10 @@ class handler(BaseHTTPRequestHandler):
             )
             full_response = response.choices[0].message.content
 
-            # SMART REGEX PARSER: Finds "SUGGESTIONS:" no matter the capitalization
             match = re.search(r'SUGGESTIONS:\s*(.*)', full_response, re.IGNORECASE | re.DOTALL)
             if match:
                 bot_response = full_response[:match.start()].strip()
                 sugg_text = match.group(1)
-                # Split by comma or newline, remove asterisks, and clean up spaces
                 suggestions = [s.strip().replace('*', '') for s in re.split(r'[,\n]', sugg_text) if s.strip()][:3]
             else:
                 bot_response = full_response
