@@ -21,8 +21,8 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
             
             user_message = data.get('message', 'Hello')
-            site_url = data.get('siteUrl', '') # e.g., https://bilal-ahmad.com
-            page_content = data.get('pageContent', '') # Fallback text from current page
+            site_url = data.get('siteUrl', '')
+            page_content = data.get('pageContent', '')
             chat_history = data.get('history', [])
             image_base64 = data.get('image', None)
             site_name = data.get('siteName', 'this website')
@@ -37,46 +37,40 @@ class handler(BaseHTTPRequestHandler):
                 api_key=api_key
             )
 
-            # --- UNIVERSAL AUTO-SCRAPER ---
-            # Python visits the website and reads multiple pages automatically
-            final_text = page_content # Start with the text sent from the browser
+            # --- FAST UNIVERSAL AUTO-SCRAPER ---
+            final_text = page_content
             if site_url:
                 try:
-                    # 1. Fetch the homepage
-                    res = requests.get(site_url, timeout=4, headers={'User-Agent': 'Mozilla/5.0'})
+                    # 1. Fetch homepage FAST (3 second timeout)
+                    res = requests.get(site_url, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
                     soup = BeautifulSoup(res.text, 'html.parser')
                     
-                    # Remove scripts and styles
                     for script in soup(["script", "style", "nav", "footer", "header"]):
                         script.extract()
                         
-                    home_text = soup.get_text(separator=' ', strip=True)
-                    final_text += "\n" + home_text
+                    final_text += "\n" + soup.get_text(separator=' ', strip=True)
 
-                    # 2. Find links to important pages (Services, Pricing, About, Contact)
+                    # 2. Find links to important pages (Services, Pricing, About)
                     important_links = []
                     for a in soup.find_all('a', href=True):
                         href = a['href'].lower()
-                        if any(word in href for word in ['service', 'price', 'plan', 'about', 'contact', 'portfolio']):
+                        if any(word in href for word in ['service', 'price', 'plan', 'about', 'contact']):
                             full_url = urljoin(site_url, a['href'])
                             if full_url.startswith(site_url) and full_url not in important_links:
                                 important_links.append(full_url)
 
-                    # 3. Fetch up to 3 important pages and read their text
-                    for link in important_links[:3]:
-                        try:
-                            sub_res = requests.get(link, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
-                            sub_soup = BeautifulSoup(sub_res.text, 'html.parser')
-                            for script in sub_soup(["script", "style", "nav", "footer", "header"]):
-                                script.extract()
-                            final_text += "\n" + sub_soup.get_text(separator=' ', strip=True)
-                        except:
-                            pass # Skip if a page fails to load
+                    # 3. Fetch ONLY 1 important page FAST (3 second timeout) to prevent Vercel crash
+                    if important_links:
+                        sub_res = requests.get(important_links[0], timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
+                        sub_soup = BeautifulSoup(sub_res.text, 'html.parser')
+                        for script in sub_soup(["script", "style", "nav", "footer", "header"]):
+                            script.extract()
+                        final_text += "\n" + sub_soup.get_text(separator=' ', strip=True)
                 except:
                     pass # If scraping fails, just use the fallback page_content
 
-            # Truncate to 15,000 characters to stay within AI limits
-            final_text = final_text[:15000]
+            # Truncate to 12,000 characters to stay fast
+            final_text = final_text[:12000]
 
             system_prompt = (
                 f"You are the helpful AI assistant for {site_name}. "
