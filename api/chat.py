@@ -18,7 +18,7 @@ class handler(BaseHTTPRequestHandler):
             data = json.loads(post_data)
             
             user_message = data.get('message', 'Hello')
-            page_content = data.get('pageContent', 'No website content provided.')[:20000] 
+            page_content = data.get('pageContent', 'No website content provided.')[:4000] 
             chat_history = data.get('history', [])
             image_base64 = data.get('image', None)
 
@@ -32,16 +32,23 @@ class handler(BaseHTTPRequestHandler):
                 api_key=api_key
             )
 
+            # READ THE GLOBAL KNOWLEDGE FILE (Info from ALL pages)
+            try:
+                with open("./knowledge.txt", "r", encoding="utf-8") as file:
+                    global_knowledge = file.read()
+            except:
+                global_knowledge = "No global knowledge available."
+
             system_prompt = (
                 "You are Bilal's personal AI assistant. "
-                "Your job is to answer questions STRICTLY based on the provided WEBSITE PAGE TEXT. "
+                "Your job is to answer questions STRICTLY based on the provided WEBSITE KNOWLEDGE and the CURRENT PAGE TEXT. "
                 "STRICT RULE: NEVER mention the Privacy Policy, chat windows, or website layouts. "
-                "Focus ONLY on Bilal's projects, skills, services, and contact info. "
+                "Focus ONLY on Bilal's projects, skills, services, pricing plans, and contact info. "
                 "Whenever you refer to the website owner, use the name Bilal. "
-                "If the user asks about services, look for the services section in the text and list them. "
-                "Do NOT start your response with phrases like 'According to the website content'. "
-                "If the answer is genuinely not in the text, say 'I am sorry, I don't have that information right now.'\n\n"
-                f"WEBSITE PAGE TEXT:\n{page_content}\n\n"
+                "Do NOT start your response with phrases like 'According to the website'. "
+                "If the answer is genuinely not in the text, say 'I am sorry, I don\\'t have that information right now.'\n\n"
+                f"WEBSITE KNOWLEDGE (All Pages):\n{global_knowledge}\n\n"
+                f"CURRENT PAGE TEXT:\n{page_content}\n\n"
                 "IMPORTANT INSTRUCTION: At the very end of your response, you MUST provide 3 short suggested questions. "
                 "Format them exactly like this on a new line: SUGGESTIONS: Question 1?, Question 2?, Question 3?"
             )
