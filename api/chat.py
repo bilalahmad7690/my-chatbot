@@ -3,7 +3,6 @@ import json
 import os
 import re
 import requests
-from bs4 import BeautifulSoup
 from urllib.parse import urljoin
 
 class handler(BaseHTTPRequestHandler):
@@ -37,35 +36,32 @@ class handler(BaseHTTPRequestHandler):
                 api_key=api_key
             )
 
-            # --- FAST UNIVERSAL AUTO-SCRAPER ---
+            # --- ULTRA-FAST REGEX SCRAPER ---
             final_text = page_content
             if site_url:
                 try:
-                    # 1. Fetch homepage FAST (3 second timeout)
-                    res = requests.get(site_url, timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
-                    soup = BeautifulSoup(res.text, 'html.parser')
+                    # 1. Fetch homepage FAST (2 second timeout)
+                    res = requests.get(site_url, timeout=2, headers={'User-Agent': 'Mozilla/5.0'})
+                    html = res.text
                     
-                    for script in soup(["script", "style", "nav", "footer", "header"]):
-                        script.extract()
-                        
-                    final_text += "\n" + soup.get_text(separator=' ', strip=True)
-
                     # 2. Find links to important pages (Services, Pricing, About)
-                    important_links = []
-                    for a in soup.find_all('a', href=True):
-                        href = a['href'].lower()
-                        if any(word in href for word in ['service', 'price', 'plan', 'about', 'contact']):
-                            full_url = urljoin(site_url, a['href'])
-                            if full_url.startswith(site_url) and full_url not in important_links:
-                                important_links.append(full_url)
+                    important_link = None
+                    links = re.findall(r'href="([^"]*)"', html)
+                    for link in links:
+                        if any(word in link.lower() for word in ['service', 'price', 'plan', 'about', 'contact']):
+                            important_link = urljoin(site_url, link)
+                            break
 
-                    # 3. Fetch ONLY 1 important page FAST (3 second timeout) to prevent Vercel crash
-                    if important_links:
-                        sub_res = requests.get(important_links[0], timeout=3, headers={'User-Agent': 'Mozilla/5.0'})
-                        sub_soup = BeautifulSoup(sub_res.text, 'html.parser')
-                        for script in sub_soup(["script", "style", "nav", "footer", "header"]):
-                            script.extract()
-                        final_text += "\n" + sub_soup.get_text(separator=' ', strip=True)
+                    # 3. Fast strip HTML tags from homepage
+                    home_text = re.sub(r'<[^>]+>', ' ', html)
+                    final_text += "\n" + home_text
+
+                    # 4. Fetch ONE extra page FAST (2 second timeout)
+                    if important_link:
+                        sub_res = requests.get(important_link, timeout=2, headers={'User-Agent': 'Mozilla/5.0'})
+                        sub_html = sub_res.text
+                        sub_text = re.sub(r'<[^>]+>', ' ', sub_html)
+                        final_text += "\n" + sub_text
                 except:
                     pass # If scraping fails, just use the fallback page_content
 
